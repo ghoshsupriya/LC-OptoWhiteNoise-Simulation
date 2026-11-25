@@ -1,0 +1,165 @@
+# Figure mapping and algorithm description
+
+## Entry scripts and outputs
+
+| Entry script | Operation | Files written |
+| --- | --- | --- |
+| run_figure1 | Calculate and display Figure 1 predictions only | None |
+| run_manuscript_results | Load data/Figure2_results.mat; display Figure 2 recovery and regenerate example dynamics | None |
+| run_demo | Simulate and fit GLMs, or reuse matching saved simulations; display plots and print the simulation summary | outputs/demo/results.mat only |
+
+run_figure1 calls lc_model_package('predictions'). run_manuscript_results calls
+lc_model_package('demo'), the internal mode now used to load manuscript results.
+run_demo calls lc_model_package('full') with OutputDir set to outputs/demo.
+The simulation size is set by cfg, not by the internal mode name.
+
+The current demo uses 1,000 trials and 400 repetitions per model variant.
+Two repetitions can be selected for a quick execution check. The manuscript
+simulations used 8,000 trials and 500 repetitions per variant. Loading the
+manuscript results uses their saved cfg rather than the demo configuration.
+
+No spreadsheets, figure files or execution reports are exported. Saved
+numerical results are replotted by rerunning the appropriate entry script;
+plot_saved_results is not needed. The old demo_inputs.mat is not used by
+these revised entry scripts, and outputs/full is not a required folder.
+
+## Figure mapping
+
+| Manuscript component | Display and numerical source |
+| --- | --- |
+| Figure 1 model schematics and task diagram | Conceptual illustrations; no automatic reconstruction of artwork |
+| Figure 1 within-trial predictions | Top panel of Generating model predictions; kernels.within |
+| Figure 1 future-trial predictions | Bottom panel of Generating model predictions; kernels.across |
+| Figure 2 example model dynamics | Persistent-state, controller and teaching example windows; corresponding example structures |
+| Figure 2 recovered temporal kernels | Kernel recovery window; recovered/population coefficient arrays |
+| Behavioral/model-recovery summaries | SIMULATION RESULT SUMMARY in the console; accuracy arrays, recovery matrices and held-out likelihood arrays in results.mat |
+
+The plotting source retains historical internal titles for the example figures;
+use this mapping rather than those historical figure numbers. The plots show
+source results, not the final manuscript multi-panel composition. Both controller
+gates are shown in the prediction and kernel-recovery plots. The three-family
+summary compares persistent state, the +100-ms controller and teaching.
+
+run_manuscript_results loads the six recovered/population coefficient arrays,
+modelNames and cfg. It regenerates illustrative trajectories using the saved
+seed and configuration without repeating the main recovery simulations. It
+returns after plotting and does not print the simulation result summary.
+
+## Figure 1 prediction calculation
+
+1. Build the full -400 to +800-ms trial timeline at 5-ms resolution, including
+   sample (0-200 ms), delay (200-400 ms), test (400-600 ms) and report (600-800 ms).
+2. For each stimulation time in the -400 to +400-ms WN window, introduce a
+   unit ON input lasting one 5-ms step.
+3. Evolve the persistent-state or controller recurrence. Compute P(correct)
+   through the same sample-memory, test-evidence and decision calculation.
+4. Average the probabilities for match and nonmatch trials at their configured
+   proportions, and calculate logit(P_perturbed) - logit(P_baseline).
+5. Separately derive within-trial predictions for entire 25-ms ON bins for
+   the constrained GLM projections; these are not averages of 5-ms impulses.
+6. For persistent across-trial predictions, insert one unit of the raw
+   stimulation-induced state-at-offset predictor multiplied by its write
+   gain into the next-trial baseline and propagate retention across lags.
+7. For teaching across-trial predictions, apply one positive unit teaching
+   event and propagate the retained weight. Direct within-trial teaching and
+   cross-trial controller contributions are zero by construction.
+
+Units: Figure 1 predictions are changes in log odds of correct behavior,
+not changes in held-out log likelihood. Across-trial predictions use each
+model's defined unit perturbation; they are not calibrated to a common
+behavioral probability change across mechanisms.
+
+## Behavioral simulation and recovery
+
+1. In each repetition, generate WN and match/nonmatch task inputs separately
+   for each model variant, as in the supplied source. Independent 25-ms WN
+   bins are Bernoulli(0.5), with 32 bins spanning [-400,400) ms.
+2. Generate trials from the persistent, controller or teaching equations.
+   Persistent state carries an operating baseline across trials; controller
+   dynamics act through a specified temporal gate; teaching updates a retained
+   weight after the current response using signed feedback (2*y - 1).
+3. Generate a separate no-LC simulation using zero inputs for the performance
+   summaries. This is the original procedure, not a matched-history causal
+   contrast imposed during packaging.
+4. Build 32 within-trial WN predictors, 20 preceding-trial persistent-drive
+   predictors and 20 preceding-trial stimulation x feedback predictors.
+   Histories and predictor standardization follow the supplied code.
+5. Fit unregularized logistic GLMs (lambda = 0) to all simulated trials for
+   descriptive kernel recovery. Fit the same designs to the model's exact
+   P(correct) to obtain the population comparison curves.
+6. Fit constrained hypothesis models to the chronological first 80% of trials
+   and score Bernoulli log likelihood on the remaining 20%. The supplied
+   preprocessing standardizes predictors using the complete generated dataset;
+   packaging does not introduce a different cross-validation procedure.
+7. Summarize accuracy, recovered kernels and model selection over repetitions.
+   Kernel confidence intervals use mean +/- 1.96*SEM across repetitions. They
+   are not intervals for a single dataset's coefficient or detection-power
+   bounds. The console accuracy summary reports mean +/- SEM.
+
+Figure 2 recovery coefficients are in log odds per standard deviation of the
+corresponding predictor. The solid lines retain the original moving-average
+display smoothing: two bins for within-trial recovery and persistent-history
+recovery, and one bin for teaching-history recovery. The original plotting
+code retains unsmoothed endpoints. Confidence-interval widths are calculated
+from the unsmoothed repeat arrays and displayed around the plotted mean.
+The per-repetition coefficient arrays remain available in the MAT file.
+
+run_demo uses automatic y-axis limits for the kernel recovery plots.
+run_manuscript_results retains the original manuscript plotting limits.
+
+## Results-file contents
+
+The simulation path saves results.mat in the selected OutputDir. The standard
+run_demo path is outputs/demo/results.mat. Principal variables are:
+
+- cfg: parameters and derived time profiles.
+- modelNames: four variants in persistent / controller 0 / controller 100 /
+  teaching order.
+- kernels.within: 160 x 4 predictions for 5-ms impulses.
+- kernels.within25: 32 x 4 predictions for 25-ms ON inputs.
+- kernels.across: 20 x 4 lagged predictions.
+- recoveredWithin, populationWithin: 32 x 4 x repetitions.
+- recoveredAcross, populationAcross: 20 x 4 x repetitions.
+- recoveredTeacherAcross, populationTeacherAcross: 20 x 4 x repetitions.
+- heldoutLL, heldoutLLWithin, heldoutLLAcross, heldoutLLCombined:
+  generating model x fitted model x repetition; mean log likelihood per trial.
+- recoveryProbability, recoveryProbabilityWithin, recoveryProbabilityAcross,
+  recoveryProbabilityCombined: four-variant model-selection fractions.
+- recovery3Within, recovery3Across, recovery3Combined: three-family selection
+  fractions considering persistent / controller +100 / teaching only. Rows
+  index generating models, columns index selected models, and diagonal values
+  give the probability of selecting the generating model over repetitions.
+- sampledAccuracyByRepeat, expectedAccuracyByRepeat, noLCAccuracyByRepeat,
+  lcAccuracyByRepeat: model x repetition probabilities.
+- exampleDatasets: first-repetition inputs, outcomes and probabilities for
+  each model. persistentLatents contains detailed first-repetition states.
+- sharedExampleTrial, exampleStateTrial, exampleControllerTrial,
+  exampleTeachingSequence: illustrative inputs and dynamics computed by the
+  original example functions.
+- packageSignature: configuration, internal mode, implementation text and
+  legacy demo-input metadata retained with the results.
+
+The results retain coefficients and summaries across all repetitions, with
+representative simulated datasets; they are not an archive of every trial
+from every repetition. Standalone run_figure1 calculations are not saved.
+
+## Saved-result reuse
+
+With ForceRecompute = false, the simulation path reuses a compatible saved
+results.mat and skips the main simulation/GLM loop. Examples and predictions
+are regenerated, plots are redrawn, and example structures and three-family
+summary matrices are appended to the MAT file. With no saved file, the script
+simulates and saves results. Incompatible saved settings cause an error.
+
+The revised compatibility check compares configuration, internal mode and
+demo-input metadata. Implementation text is retained for provenance rather
+than invalidating results after display-only edits. If the model equations
+or fitting calculations change, use ForceRecompute = true or a new OutputDir.
+Recomputation in an existing OutputDir replaces its results.mat. Loading
+data/Figure2_results.mat through run_manuscript_results does not modify it.
+
+## Scope
+
+This document covers the Figure 1/Figure 2 code only. Empirical analyses and
+supplementary analyses, including the separate sensitivity analysis, are not
+part of this package.
