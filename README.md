@@ -1,7 +1,7 @@
 # LC-OptoWhiteNoise-Simulation
 Behavioral simulation supporting "Transient noradrenergic signals act as online controllers of perceptual computation."
 
-# MATLAB scripts for Figures 1 and 2
+### MATLAB scripts for Figures 1 and 2
 Supriya Ghosh and John H. R. Maunsell
 Transient noradrenergic signals act as online controllers of perceptual computation
 
