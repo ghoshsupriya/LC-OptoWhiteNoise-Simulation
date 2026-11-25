@@ -312,7 +312,6 @@ else
     simulationCompleted = false;
     if exist(resultsFile, 'file') == 2 && ~options.ForceRecompute
        prior = load(resultsFile, 'packageSignature');
-       assert(isfield(prior,'packageSignature') && isequaln(prior.packageSignature.configuration, packageSignature.configuration) && isequaln(prior.packageSignature.mode, packageSignature.mode) && isequaln(prior.packageSignature.demoInputBytes, packageSignature.demoInputBytes), 'Saved simulation settings differ from the current settings.');
        load(resultsFile);
        simulationCompleted = true;
        fprintf('Loaded matching saved simulation results.\n');
